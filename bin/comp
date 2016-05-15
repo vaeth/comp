@@ -1,0 +1,770 @@
+#!/usr/bin/env perl
+require 5.012;
+package Comp v4.0.0;
+
+use warnings;
+use strict;
+use integer;
+
+use File::Find ();
+use File::Spec ();
+use Getopt::Long 2.24 ();
+#use Pod::Usage ();
+#use String::ShellQuote ();  # not mandatory but recommended: poor fallback
+
+=head1 NAME
+
+comp - compare files or directories, including metadata
+
+=head1 SYNOPSIS
+
+=over 8
+
+=item B<comp> [options] I<Dir/File> I<Dir/File>  ... I<LastDir/LastFile>
+
+=item B<comp> [options] I<Dir>
+
+=back
+
+Compare the list of Files and Directories against LastDir/LastFile.
+The case that several first arguments are specified is treated as if
+the directories/files lie all in the same top-level directory.
+In the second form, compare against the current directory.
+
+Also some metadata like timestamps/attributes are compared unless specified
+by options.
+
+The exit status is 0 if all is equal, 1 if there are differences,
+or 2 in case of errors.
+
+Options B<--man> (or B<-?>) respectively B<--help> (or B<-h>)
+give an explicit help as a manpage resp. an ascii-text.
+
+=head1 OPTIONS AND ARGUMENTS
+
+=over 8
+
+=item B<--down> or B<-d>
+
+Do B<not> compare metadata of highest directories.
+This is the same as adding each argument to B<--ignore-file>.
+
+=item B<--norecurse> or B<-r>
+
+Do B<not> compare recursively (except for one step in directory arguments).
+This is the same as B<--prune-expression=.>
+
+=item B<--nocomp> or B<-c>
+
+Do not compare the content of files. This is a shortcut for B<-C -content>
+
+=item B<--metadata> or B<-m>
+
+Do not compare the content of directories.
+This is a shortcut for B<-C -dircontent>
+
+=item B<--ignore-case> B<-i>
+
+Treat all paths as lower case for comparison purposes (useful for FAT)
+
+=item B<--warn> or B<-w>
+
+Shortcut for B<-C warn>
+
+=item B<--only-first> or B<-1>
+
+Shurtcut for B<-C -2>
+
+=item B<--only-last> or B<-2>
+
+Shortcut for B<-C -1>
+
+=item B<--tex> or B<-x>
+
+TeX Mode: Ignore all files with the extensions
+B<bbl ind dvi toc lof lot idx glo out run.xml bcf log dlg ilg blg cb thm>
+and cut (ignore and prune) all files/dirs of the form B<*.prv _region_.*>
+This is a shortcut for specifying a corresponding list of B<--ignore-regexp>
+and B<--cut-regexp> expressions.
+
+=item B<--resolve> or B<-follow> or B<-l>
+
+This a shortcut for B<--recurse-resolve>, B<-C resolve,-linktype,-linkname>
+
+=item B<--recurse-resolve>
+
+Resolve symbolic links when recursing into directories.
+
+=item B<--comp=>I<type-list> or B<-C> I<type-list>
+
+Add all I<types> from I<type-list> (a list separated by commas, colons,
+or spaces) to the list of data to be compared.
+If preceeded by B<->, the corresponding type is removed from the list.
+Later specified types override earlier ones.
+For instance, B<-C times,-ctime> will compare all times except for B<ctime>,
+and B<-lC default -C -default> will restore the original default after
+the B<-l>.
+
+The following I<type>s are supported.
+
+=over 16
+
+=item B<content> or B<data> (default)
+
+Compare content of files if sizes are the same
+
+=item B<partialcontent>
+
+Compare the (partial) content of files even if sizes differ
+
+=item B<size> or B<length> (default)
+
+Size (of ordinary files, only)
+
+=item B<dirsize> or B<dirlength>
+
+Size (of directories, only)
+
+=item B<dircontent> (default)
+
+Compare the content of directories (recursively)
+
+=item B<mtime> (default)
+
+Compare last modification time
+
+=item B<ctime>
+
+Compare creation time
+
+=item B<atime>
+
+Compare last access time
+
+=item B<times>
+
+Same as B<mtime,ctime,atime>
+
+=item B<nonfile> or B<non-file> (default)
+
+Compare metadata of file types other than files, dirs, symlinks
+
+=item B<dir> (default)
+
+Compare metadata of directories
+
+=item B<link>
+
+Compare metadata of symlinks
+
+=item B<devices> (default)
+
+Compare device types
+
+=item B<resolve> or B<follow>
+
+Compare the content of symlinks, not the symlink itself
+
+=item B<linktype> (default)
+
+Links must match links
+
+=item B<linkdest> (default)
+
+Links must match exactly (i.e. the destination the links point to)
+
+=item B<hardlinks>
+
+The number of hardlinks must match
+
+=item B<mode> (default)
+
+=item B<owner> (default)
+
+=item B<group> (default)
+
+=item B<permissions> or B<perm> or B<perms>
+
+Same as B<mode,owner,group>
+
+=item B<warnlink>
+
+Print a warning if files are symlinks
+
+=item B<warndangling> or B<dangling>
+
+Print a warning if files are dangling symlinks
+
+=item B<warnzero> or B<zero>
+
+Print a warning if an ordinary file has 0 (or negative size)
+
+=item B<warntype> or B<type>
+
+Print a warning if a file has another type than a symlink, file, or directory
+
+=item B<warn> or B<warning>
+
+Same as B<warnlink,warndangling,warnzero,warntype>
+
+=item B<1> (default)
+
+All files from the first specified files/directories must have a match
+
+=item B<2> (default)
+
+All files from the last specified file/directory must have a match
+
+=item B<12> or B<21>
+
+Same as 1,2
+
+=item B<default>
+
+all specified as B<default>
+
+=item B<nodefault>
+
+all not specified as B<default> except B<resolve>
+
+=item B<all>
+
+all of the above except B<resolve>
+
+=back
+
+=item B<--ignore-path>I<path>
+
+Ignore all files with path I<path> when recursing into directory
+
+=item B<--ignore-regexp>I<regexp>
+
+Ignore all files with path matching the perl type regular expression
+I<regexp> when recursing into directory. (B<man perlre> for details.)
+
+=item B<--prune-path>I<path>
+
+Prune the content of all dirs matching I<path> when recursing into directory
+
+=item B<--prune-regexp>I<regexp>
+
+Prune the content of all dirs with path matching the perl type
+regular expressoin I<regexp> when recursing into directory.
+(B<man perlre> for details.)
+
+=item B<--cut-path>I<path>
+
+Shortcut for B<--ignore-path=>I<path>, B<--prune-path=>I<path>
+
+=item B<--cut-regexp>I<regexp>
+
+Shortcut for B<--ignore-regexp=>I<regexp>, B<--prune-regexp=>I<regexp>
+
+=item B<--print-comptypes>
+
+For debugging: output all accumulated values with B<--comp> and exit
+
+=item B<--version> or B<-V>
+
+Print version number
+
+=back
+
+=head1 AUTHOR
+
+Martin VE<auml>th E<lt>martin@mvath.deE<gt>
+
+=cut
+
+# Global Variables
+
+our $VERSION;
+my $exitstatus = 0;
+
+# Default for the Options:
+
+my %comp;
+my $recurseresolve = '';
+my %ignore = ();
+my @ignore = ();
+my %prune = ();
+my @prune = ();
+
+{
+my %opt = (
+	'content' => undef,
+	'data' => 'content',
+	'partialcontent' => undef,
+	'size' => undef,
+	'length' => 'size',
+	'dirsize' => undef,
+	'dircontent' => undef,
+	'mtime' => undef,
+	'atime' => undef,
+	'ctime' => undef,
+	'times' => [ qw(mtime atime ctime) ],
+	'nonfile' => undef,
+	'non-file' => 'nonfile',
+	'dir' => undef,
+	'link' => undef,
+	'devices' => undef,
+	'resolve' => undef,
+	'follow' => 'resolve',
+	'linktype' => undef,
+	'linkdest' => undef,
+	'hardlinks' => undef,
+	'mode' => undef,
+	'owner' => undef,
+	'group' => undef,
+	'perm' => [ qw(mode owner group) ],
+	'perms' => 'perm',
+	'permissions' => 'perm',
+	'warnlink' => undef,
+	'warn-link' => 'warnlink',
+	'link' => 'warnlink',
+	'warndangling' => undef,
+	'warn-dangling' => 'warndangling',
+	'dangling' => 'warndangling',
+	'warnzero' => undef,
+	'warn-zero' => 'warnzero',
+	'zero' => 'warnzero',
+	'warntype' => undef,
+	'warn-type' => 'warntype',
+	'type' => 'warntype',
+	'warn' => [ qw(warnlink warndangling warnzero warntype) ],
+	'warning' => 'warn',
+	'1' => undef,
+	'2' => undef,
+	'12' => [ qw(1 2) ],
+	'21' => '12',
+	'default' => [ qw(content size dircontent mtime nonfile dir devices
+		linktype linkdest perm 12) ],
+	'nodefault' => [ qw(partialcontent dirsize ctime atime hardlinks
+		warn) ],
+	'all' => [ qw(default nodefault) ]
+);
+for my $i (values(%opt)) {
+	next unless(defined($i));
+	for my $j (ref($i) ? @$i : ($i)) {
+		&fatal("internal error: illegal option '$j'")
+			unless(exists($opt{$j}))
+	}
+}
+sub comptype {
+	for my $i (split(/[^a-zA-Z0-9\-\_]/, join(',', @_))) {
+		my $add = !($i =~ s{^\-+}{});
+		next if($i eq '');
+		&fatal("unknown comp type '$i'") unless(exists($opt{$i}));
+		my $value = $opt{$i};
+		if(($value // '') eq '') {
+			$comp{$i} = $add
+		} else {
+			for my $j (ref($value) ? @$value : ($value)) {
+				&comptype($add ? $j : '-' . $j)
+			}
+		}
+	}
+}}
+
+sub print_comptypes {
+	for my $i (sort(keys(%comp))) {
+		print($i, ': ', ($comp{$i} ? 'active' : 'inactive'), "\n");
+	}
+	exit(0)
+}
+
+# use String::ShellQuote () and return whether successful
+
+{ my $shellquote = undef;  # A closure static variable
+sub use_shellquote {
+	return $shellquote if(defined($shellquote));
+	eval {
+		require String::ShellQuote
+	};
+	$shellquote = !$@
+}}
+
+# like join(' ', @_), but shell-quote arguments
+
+sub join_quoted {
+	my @r;
+	for my $i (@_) {
+		my $a = $i;
+		$a =~ s{\'}{\'\\\'\'}g;
+		$a = "'$a'";
+		$a =~ s{(\A|[^\\])\'([\w\-\,\.\:\/]*)\'}{$1$2}gm;
+		push(@r, ($a ne '') ? $a : "''")
+	}
+	join(' ', @r)
+}
+
+sub shell_quote_best_effort {
+	(&use_shellquote() ?
+		&String::ShellQuote::shell_quote_best_effort : &join_quoted)
+}
+
+sub error {
+	print(STDERR 'comp: ', @_, "\n");
+	$exitstatus = 2
+}
+
+sub warn {
+	print('warning: ', @_, "\n")
+}
+
+sub fatal {
+	&error;
+	exit(2)
+}
+
+sub diff {
+	print(@_, "\n");
+	$exitstatus = 1 unless($exitstatus == 2)
+}
+
+sub diffn {
+	&diff($_[0], ': ', &shell_quote_best_effort($_[1]))
+}
+
+sub diffw {
+	&warn($_[0], ': ', &shell_quote_best_effort($_[1]))
+}
+
+sub diffe {
+	&error($_[0], ': ', &shell_quote_best_effort($_[1]))
+}
+
+sub difff {
+	&fatal($_[0], ': ', &shell_quote_best_effort($_[1]))
+}
+
+sub printdiff {
+	my $a = shift();
+	my $b = shift();
+	&diff('differing ', join(', ', @_),  ': ',
+		&shell_quote_best_effort($a), ' ',
+		&shell_quote_best_effort($b)) if(@_)
+}
+
+sub version {
+	print('comp ', $VERSION, "\n");
+	exit(0)
+}
+
+sub pod2usage {
+	require Pod::Usage;
+	&Pod::Usage::pod2usage
+}
+
+# Parse Options:
+
+&comptype(qw(-all -resolve default));
+{
+	my $opt_down = '';
+Getopt::Long::Configure(qw(gnu_getopt));
+Getopt::Long::GetOptions(
+	'help|h', sub { &pod2usage(0) },
+	'man|?', sub { &pod2usage(-verbose => 2, -exit => 0) },
+	'version|V', \&version,
+	'down|d', \$opt_down,
+	'norecurse|r', sub { push(@prune, qr{.}) },
+	'nocomp|c', sub { &comptype('-content') },
+	'metadata|m', sub { &comptype('-dircontent') },
+	'warn|w', sub { &comptype('warn') },
+	'only-first|1', sub { &comptype('-2') },
+	'only-last|2', sub { &comptype('-1') },
+	'tex|x', sub {
+		for my $i (qw(bbl ind dvi toc lof lot idx glo out
+			run.xml bcf log dlg ilg blg cb thm)) {
+			push(@ignore, qr{\.$i$});
+			push(@prune, qr{\.$i$})
+		}
+		for my $i (qr{.prv$}, qr{\/\_region\_\.[^\/]*$}) {
+			push(@ignore, $i);
+			push(@prune, $i)
+		}},
+	'recurse-resolve', \$recurseresolve,
+	'resolve|follow|l', sub { $recurseresolve = 1;
+		&comptype('resolve,-linktype,-linkname') },
+	'comp|C=s', sub { &comptype($_[1]) },
+	'ignore-path=s', sub { $ignore{File::Spec->canonpath($_[1])} = 1 },
+	'ignore-regexp=s', sub { push(@ignore, $_[1]) },
+	'prune-path=s', sub { $prune{File::Spec->canonpath($_[1])} = 1 },
+	'prune-regexp=s', sub { push(@prune, $_[1]) },
+	'cut-path=s', sub {
+		my $path = File::Spec->canonpath($_[1]);
+		$ignore{$path} = $prune{$path} = 1
+	},
+	'cut-regexp=s', sub { push(@ignore, $_[1]);
+		push(@prune, $_[1]) },
+	'print-comptypes', \&print_comptypes
+) or &pod2usage(2);
+&pod2usage(2) unless(@ARGV);
+
+push(@ARGV, File::Spec->curdir()) if(@ARGV == 1);
+for my $i (@ARGV) {
+	$i = File::Spec->canonpath($i);
+	$ignore{$i} = 1 if($opt_down);
+	&difff('cannot access', $i) unless(-e $i)
+}
+}  # end of option parsing
+
+my @baselist = ();
+for my $i (@ARGV) {
+	if((-d $i) && ($recurseresolve || !(-l $i))) {
+		my $j = [ (File::Spec->splitdir($i)) ];
+		push(@baselist, $j)
+	} else {
+		push(@baselist, '')
+	}
+}
+
+my $destfile = pop(@ARGV);
+my $destbase = pop(@baselist);
+unless(ref($destbase)) {
+	&fatal('when specifying 3 or more arguments, last must be a directory')
+		if(@ARGV > 1)
+}
+
+my $currbase;
+my $phase = '1';
+my %checked = ();
+
+my %find_args = (
+	no_chdir => 1,
+	dangling_symlinks => ($comp{'warndangling'} ?
+		sub { &diffw('dangling symlink', $_[0]) } : ''),
+	wanted => sub {
+	my $file = File::Spec->canonpath($_);
+	if($prune{$file}) {
+		$File::Find::prune = 1
+	} else {
+		for my $i (@prune) {
+			if($file =~ m{$i}) {
+				$File::Find::prune = 1;
+				last
+			}
+		}
+	}
+	my $isdir = (-d $file);
+	if($isdir && !$comp{'dircontent'}) {
+		$File::Find::prune = 1
+	}
+	return if($ignore{$file});
+	for my $i (@ignore) {
+		return if($file =~ m{$i})
+	}
+	if($phase eq '2') {
+		&comp($file, undef, $isdir) unless(exists($checked{$file}));
+		return
+	}
+	my $dest = undef;
+	if(ref($destbase)) {
+		my @dirs = File::Spec->splitdir($file);
+		splice(@dirs, 0, scalar(@$currbase));
+		$dest = File::Spec->catdir(@$destbase, @dirs)
+	} else {
+		$dest = $destfile
+	}
+	&comp($file, $dest, $isdir)
+		unless(defined($dest) && exists($checked{$dest}));
+	$checked{$dest} = 1 if(defined($dest))
+});
+if($recurseresolve) {
+	$find_args{'follow'} = 1;
+	$find_args{'follow_skip'} = 2
+}
+
+for(my $i = 0; $i < @ARGV; ++$i) {
+	$currbase = $baselist[$i];
+	File::Find::find(\%find_args, $ARGV[$i]);
+}
+$phase = '2';
+File::Find::find(\%find_args, $destfile);
+exit($exitstatus);
+
+sub comp {
+	my ($file, $dest, $isdir) = @_;
+	my $islink = undef;
+	my $isfile = ($isdir ? '' : undef);
+	if($comp{'warnlink'}) {
+		&diffw('symlink', $file) if($islink //= (-l $file))
+	}
+	if($comp{'warntype'} && !$isdir) {
+		unless($islink //= (-l $file)) {
+			unless($isfile //= (-f $file)) {
+				&diffw('no ordinary type', $file)
+			}
+		}
+	}
+	my $isnolink = ($comp{'resolve'} || !($islink //= (-l $file)));
+	my @stat = ($isnolink ? stat($file) : lstat($file));
+	my $size;
+	if(@stat) {
+		$size = $stat[7];
+		&diffw('zero size file', $file) if((!$isdir) &&
+			$isnolink && ($size <= 0) && $comp{'warnzero'} &&
+			($isfile //= (-f $file)))
+	} else {
+		&diffe('cannot stat', $file)
+	}
+	my @deststat = ();
+	my $destislink = undef;
+	my $destisnolink;
+	if(defined($dest)) {
+		$destisnolink = ($comp{'resolve'} || !($destislink //= (-l $dest)));
+		@deststat = ($destisnolink ? stat($dest) : lstat($dest))
+	}
+	unless(@deststat) {
+		&diffn('no match for', $file) if($comp{$phase});
+		return ''
+	}
+	return 1 unless(@stat);
+	my @diff = ();
+	$islink //= (-l $file);
+	$destislink //= (-l $dest);
+	if($islink ne $destislink) {
+		push(@diff, 'link types') if($comp{'linktype'});
+	}
+	if((!$isnolink) && (!$destisnolink) && $comp{'linkdest'}) {
+		my $a = readlink($file);
+		&diffe('cannot read link', $file) unless(defined($a));
+		my $b = readlink($dest);
+		&diffe('cannot read link', $dest) unless(defined($b));
+		push(@diff, 'link destinations')
+			if(defined($a) && defined($b) && ($a ne $b))
+	}
+	my $metadata = undef;
+	my $difftype = undef;
+	unless($comp{'resolve'}) {
+		unless($islink eq $destislink) {
+			&printdiff($file, $dest, @diff);
+			return 1
+		}
+		if($islink) {
+			$metadata = $comp{'link'};
+			$difftype = ''
+		}
+	}
+	my $destisdir = undef;
+	my $destisfile = undef;
+	unless(defined($difftype)) {
+		$destisdir = (-d $dest);
+		$destisfile = '' if($destisdir);
+		$difftype = 1 if($isdir ne $destisdir)
+	}
+	unless(defined($difftype)) {
+		$isfile //= (-f $file);
+		$destisfile //= (-f $dest);
+		$difftype = ($isfile ne $destisfile)
+	}
+	if($difftype) {
+		push(@diff, 'types');
+		&printdiff($file, $dest, @diff);
+		return 1
+	}
+	unless(defined($metadata)) {
+		$metadata = $comp{'dir'} if($isdir)
+	}
+	unless(defined($metadata)) {
+		$isfile //= (-f $file);
+		$metadata = ($isfile || $comp{'nonfile'})
+	}
+	my $destsize = undef;
+	if($metadata) {
+		push(@diff, 'mtimes')
+			if(($stat[9] != $deststat[9]) && $comp{'mtime'});
+		push(@diff, 'ctimes')
+			 if(($stat[10] != $deststat[10]) && $comp{'ctime'});
+		push(@diff, 'atimes')
+			if(($stat[8] != $deststat[8]) && $comp{'atime'});
+		push(@diff, 'modes')
+			if(($stat[2] ne $deststat[2]) && $comp{'mode'});
+		push(@diff, 'owners')
+			if(($stat[4] ne $deststat[4]) && $comp{'owner'});
+		push(@diff, 'groups')
+			if(($stat[5] ne $deststat[5]) && $comp{'group'});
+		unless($islink && !$comp{'resolve'}) {
+			$size //= $stat[7];
+			$destsize = $deststat[7];
+			if($size != $destsize) {
+				push(@diff, 'sizes')
+					if($isdir ? $comp{'dirsize'}
+						: (($isfile //= (-f $file)) &&
+							$comp{'size'}))
+			}
+			unless($isdir) {
+				if($isfile //= (-f $file)) {
+					push(@diff, 'hardlinks')
+						if(($stat[3] != $deststat[3])
+							&& $comp{'hardlinks'})
+				} else {
+					push(@diff, 'device-ids')
+						if(($stat[6] ne $deststat[6])
+							&& $comp{'devices'})
+				}
+			}
+		}
+	}
+	unless($isdir || ($islink && !$comp{'resolve'})) {
+		if($comp{'content'} || $comp{'partialcontent'}) {
+			$size //= $stat[7];
+			$destsize //= $deststat[7];
+			if((($size == $destsize) || $comp{'partialcontent'})
+				&& ($isfile //= (-f $file))) {
+				my $minsize = ($size <= $destsize) ?
+					$size : $destsize;
+				&comparefile($file, $dest, $minsize,
+					\@stat, \@deststat)
+					|| push(@diff, 'contents')
+			}
+		}
+	}
+	&printdiff($file, $dest, @diff);
+	1
+}
+
+sub comparefile {
+	my ($a, $b, $toread, $as, $bs) = @_;
+	return 1 if(($as->[0] eq $bs->[0]) && ($as->[1] eq $bs->[1]));
+	my $blksize = ($as->[11] // 0);
+	{
+		my $destblksize = ($bs->[11] // 0);
+		$blksize = $destblksize if($destblksize > $blksize);
+		$blksize = 512 if($blksize < 512);
+		$blksize *= 1024 if($blksize <= 4096)
+	}
+	my $result = 1;
+	my ($afile, $bfile);
+	if(open($afile, '<', $a)) {
+		binmode($afile)
+	} else {
+		&diffe('cannot open', $a);
+		$result = ''
+	}
+	if(open($bfile, '<', $b)) {
+		binmode($bfile)
+	} else {
+		&diffe('cannot open ', $b);
+		$result = ''
+	}
+	while($result && ($toread > 0)) {
+		my $readnow = (($toread < $blksize) ? $toread : $blksize);
+		my ($ablock, $bblock);
+		if((read($afile, $ablock, $readnow)) != $readnow) {
+			&diffe('read error for file ', $a);
+			$result = ''
+		}
+		if((read($bfile, $bblock, $readnow)) != $readnow) {
+			&diffe('read error for file ', $b);
+			$result = ''
+		}
+		if($result && ($ablock ne $bblock)) {
+			$result = ''
+		}
+		$toread -= $readnow if($result)
+	}
+	close($bfile);
+	close($afile);
+	$result
+}
