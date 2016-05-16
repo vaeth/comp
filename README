@@ -28,5 +28,3 @@ fpath+=("...")) before you call compdef from your zsh initialization files).
 
 For installation under Gentoo, you can use the ebuild from the mv overlay
 (which is available by layman).
-
-Currrently, this script is in a first alpha phase, so some bugs can be expected

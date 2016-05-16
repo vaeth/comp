@@ -8,7 +8,7 @@ _arguments -C -s -S : \
 '(1 * -)--print-comptypes[print comparison types]' \
 {'(--down)-d','(-d)--down'}'[skip metadata for highest directory]' \
 {'(--norecurse)-r','(-r)--norecurse'}'[do not compare recursively]' \
-{'(--nocomp)-c','(-c)--nocomp'}'[no data comparison\: -C -content]' \
+{'(--nocontent)-c','(-c)--nocontent'}'[no data comparison\: -C -content]' \
 {'(--metadata)-m','(-m)--metadata'}'[only dir metadata\: -C -dircontent]' \
 {'(--warn)-w','(-w)--warn'}'[warnings\: -C warn]' \
 {'(--only-first)-1','(-1)--only-first'}'[same as -C -2]' \
@@ -16,70 +16,94 @@ _arguments -C -s -S : \
 '--recurse-resolve[follow symlinks while recursing]' \
 {'(--recurse-resolve --follow --resolve)-l','(-recurse-resolve --follow -l)--resolve','(-recurse-resolve --resolve -l)--follow'}'[always follow symlinks]' \
 {'(--tex)-x','(-x)--tex'}'[TeX Mode\: Ignore temporary tex files ...]' \
-{'*-C+','*--comp='}'[add/sub specified comp type]:comp type:->comptypes' \
-'*-ignore-path='}'[ignore specified path]:ignore path:_files' \
-'*-prune-path='}'[prune at specified path]:prune path:_files' \
-'*-cut-path='}'[ignore \& prune at specified path]:cut path:_files' \
-'*-ignore-regexp='}'[ignore for specfied regexp]:ignore regexp:_files' \
-'*-prune-regexp='}'[prune for specified regexp]:prune regexp:_files' \
-'*-cut-regexp='}'[ignore \& prune for specified regexp]:cut regexp:_files' \
+{'*-C+','*-t+','*--comp='}'[add specified comp types]:comp type:->comptypes' \
+{'*-n+','*-T+','*--nocomp='}'[sub specified comp types]:comp type:->comptypes' \
+'*-ignore-path=[ignore specified path]:ignore path:_files' \
+'*-prune-path=[prune at specified path]:prune path:_files' \
+'*-cut-path=[ignore \& prune at specified path]:cut path:_files' \
+'*-ignore-regexp=[ignore for specfied regexp]:ignore regexp:_files' \
+'*-prune-regexp=[prune for specified regexp]:prune regexp:_files' \
+'*-cut-regexp=[ignore \& prune for specified regexp]:cut regexp:_files' \
 '*:mask:_files'
 local ret=$?
 case $state in
 (comptypes)
-	compset -P \*,
-	compset -S ,\*
 	local comptypes
 	comptypes=(
-	'help:print a brief help'
-	'content:compare file content'
-	'data:compare file content'
-	'partialcontent:compare partial file content'
-	'size:compare size of files'
-	'length:compare size of files'
-	'dirsize:compare size of dirs'
-	'dircontent:recurse into dirs'
-	'mtime:compare modify time'
-	'atime:compare access time'
-	'ctime:compare creation time'
-	'times:atime \& mtime \& ctime'
-	'nonfile:compare metadata of other files'
-	'non-file:compare metadata of ther files'
-	'dir:compare metadata of dirs'
-	'link:compare metadata of symlinks'
-	'devices:compare device numbers'
-	'resolve:follow symlinks for comparison'
-	'follow:follow symlinks for comparison'
-	'linktype:link must match link'
-	'linkdest:compare link destinations'
-	'hardlinks:compare hardlink number'
-	'mode:compare mode'
-	'owner:compare owner'
-	'group:compare group'
-	'perm:mode \& owner \& group'
-	'perms:mode \& owner \& group'
-	'permissions:mode \& owner \& group'
-	'warnlink:warn for symlinks'
-	'warn-link:warn for symlinks'
-	'link:warn for symlinks'
-	'warndangling:warn for dangling links'
-	'warn-dangling:warn for dangling links'
-	'dangling:warn for dangling links'
-	'warnzero:warn for zero size files'
-	'warn-zero:warn for zero size files'
-	'zero:warn for zero size files'
-	'warntype:warn for other file types'
-	'warn-type:warn for other file types'
-	'type:warn for other file types'
-	'warn:warnlink \& warndangling \& warnzero \& warntype'
-	'warning:warnlink \& warndangling \& warnzero \& warntype'
-	'1:first files must match'
-	'2:second files must match'
-	'12:all files must match'
-	'21:all files must match'
+	'content:compare file content?'
+	'data:compare file content?'
+	'-content:compare file content?'
+	'-data:compare file content?'
+	'partialcontent:compare partial file content?'
+	'-partialcontent:compare partial file content?'
+	'size:compare size of files?'
+	'length:compare size of files?'
+	'-size:compare size of files?'
+	'-length:compare size of files?'
+	'dirsize:compare size of dirs?'
+	'-dirsize:compare size of dirs?'
+	'dircontent:recurse into dirs?'
+	'-dircontent:recurse into dirs?'
+	'mtime:compare modify time?'
+	'-mtime:compare modify time?'
+	'atime:compare access time?'
+	'-atime:compare access time?'
+	'ctime:compare creation time?'
+	'-ctime:compare creation time?'
+	'times:atime,mtime,ctime?'
+	'-times:atime,mtime,ctime?'
+	'nonfile:compare metadata of other files?'
+	'-nonfile:compare metadata of other files?'
+	'dir:compare metadata of dirs?'
+	'-dir:compare metadata of dirs?'
+	'link:compare metadata of symlinks?'
+	'-link:compare metadata of symlinks?'
+	'device:compare device numbers?'
+	'-device:compare device numbers?'
+	'resolve:follow symlinks for comparison?'
+	'follow:follow symlinks for comparison?'
+	'-resolve:follow symlinks for comparison?'
+	'-follow:follow symlinks for comparison?'
+	'linktype:link must match link?'
+	'-linktype:link must match link?'
+	'linkdest:compare link destinations?'
+	'-linkdest:compare link destinations?'
+	'hardlinks:compare hardlink number?'
+	'-hardlinks:compare hardlink number?'
+	'mode:compare mode?'
+	'-mode:compare mode?'
+	'owner:compare owner?'
+	'-owner:compare owner?'
+	'group:compare group?'
+	'-group:compare group?'
+	'perm:mode,owner,group'
+	'permissions:mode,owner,group'
+	'-perm:-mode,-owner,-group'
+	'-permissions:-mode,-owner,-group'
+	'warnlink:warn for symlinks?'
+	'-warnlink:warn for symlinks?'
+	'warndangling:warn for dangling links?'
+	'-warndangling:warn for dangling links?'
+	'warnzero:warn for zero size files?'
+	'-warnzero:warn for zero size files?'
+	'warntype:warn for other file types?'
+	'-warntype:warn for other file types?'
+	'warn:all warnings'
+	'-warn:all warnings'
+	'1:must first files match?'
+	'-1:must first files match?'
+	'2:must second files match?'
+	'-2:must second files match?'
+	'12:must all files match?'
+	'21:must all files match?'
+	'-12:must all files match?'
+	'-21:must all files match?'
 	'default:defaults'
-	'nodefault:off defaults'
-	'all:all except resolve
+	'-default:defaults'
+	'nodefault:non-defaults except resolve'
+	'-nodefault:non-defaults except resolve'
+	'all:all except resolve'
+	'-all:all except resolve'
 	)
 	_describe -t comptypes 'comptype' comptypes
 	ret=$?;;

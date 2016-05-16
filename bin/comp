@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 require 5.012;
-package Comp v4.0.0;
+package Comp v4.1.0;
 
 use warnings;
 use strict;
@@ -27,15 +27,18 @@ comp - compare files or directories, including metadata
 =back
 
 Compare the list of Files and Directories against LastDir/LastFile.
-The case that several first arguments are specified is treated as if
-the directories/files lie all in the same top-level directory.
-In the second form, compare against the current directory.
+Usually, one only specifies two directories or two files, only.
+(In case of one argument, the last directory is assumed to be the current one.)
+If three or more arguments are specified, the last must be a directory,
+and the handling is as if the files from the first arguments would all
+reside in the same directory specified by the first argument.
 
-Also some metadata like timestamps/attributes are compared unless specified
-by options.
+The options specify which metadata (timestamps/attributes) are compared,
+whether symlinks are followed or compared, and whether file content is
+compared.
 
-The exit status is 0 if all is equal, 1 if there are differences,
-or 2 in case of errors.
+The exit status is 0 if all compared data is equal, 1 if there are differences,
+or 2 in case of errors. Warnings do not influence the exit status.
 
 Options B<--man> (or B<-?>) respectively B<--help> (or B<-h>)
 give an explicit help as a manpage resp. an ascii-text.
@@ -54,30 +57,26 @@ This is the same as adding each argument to B<--ignore-file>.
 Do B<not> compare recursively (except for one step in directory arguments).
 This is the same as B<--prune-expression=.>
 
-=item B<--nocomp> or B<-c>
+=item B<--nocontent> or B<-c>
 
-Do not compare the content of files. This is a shortcut for B<-C -content>
+Do not compare the content of files. This is a shortcut for B<-T content>
 
 =item B<--metadata> or B<-m>
 
 Do not compare the content of directories.
-This is a shortcut for B<-C -dircontent>
-
-=item B<--ignore-case> B<-i>
-
-Treat all paths as lower case for comparison purposes (useful for FAT)
+This is a shortcut for B<-T dircontent>
 
 =item B<--warn> or B<-w>
 
-Shortcut for B<-C warn>
+Shortcut for B<-t warn>
 
 =item B<--only-first> or B<-1>
 
-Shurtcut for B<-C -2>
+Shurtcut for B<-T 2>
 
 =item B<--only-last> or B<-2>
 
-Shortcut for B<-C -1>
+Shortcut for B<-T 1>
 
 =item B<--tex> or B<-x>
 
@@ -89,21 +88,22 @@ and B<--cut-regexp> expressions.
 
 =item B<--resolve> or B<-follow> or B<-l>
 
-This a shortcut for B<--recurse-resolve>, B<-C resolve,-linktype,-linkname>
+This a shortcut for B<--recurse-resolve>, B<-t resolve,-linktype,-linkdest>
 
 =item B<--recurse-resolve>
 
 Resolve symbolic links when recursing into directories.
 
-=item B<--comp=>I<type-list> or B<-C> I<type-list>
+=item B<--comp=>I<type-list> or B<-t> I<type-list> or B<-C> I<type-list>
 
 Add all I<types> from I<type-list> (a list separated by commas, colons,
 or spaces) to the list of data to be compared.
-If preceeded by B<->, the corresponding type is removed from the list.
+If preceeded by B<-> or B<!>, the corresponding type is removed from the list.
 Later specified types override earlier ones.
-For instance, B<-C times,-ctime> will compare all times except for B<ctime>,
-and B<-lC default -C -default> will restore the original default after
-the B<-l>.
+For instance, B<-t times,-ctime> will compare B<mtime> and B<atime>,
+and B<-lt -all,defaults -T resolve> will restore the original default types
+after the B<-l> (and thus is the same as B<--recurse-resolve> if no other
+options are specified).
 
 The following I<type>s are supported.
 
@@ -145,7 +145,7 @@ Compare last access time
 
 Same as B<mtime,ctime,atime>
 
-=item B<nonfile> or B<non-file> (default)
+=item B<nonfile> (default)
 
 Compare metadata of file types other than files, dirs, symlinks
 
@@ -157,7 +157,7 @@ Compare metadata of directories
 
 Compare metadata of symlinks
 
-=item B<devices> (default)
+=item B<device> (default)
 
 Compare device types
 
@@ -191,15 +191,15 @@ Same as B<mode,owner,group>
 
 Print a warning if files are symlinks
 
-=item B<warndangling> or B<dangling>
+=item B<warndangling>
 
 Print a warning if files are dangling symlinks
 
-=item B<warnzero> or B<zero>
+=item B<warnzero>
 
 Print a warning if an ordinary file has 0 (or negative size)
 
-=item B<warntype> or B<type>
+=item B<warntype>
 
 Print a warning if a file has another type than a symlink, file, or directory
 
@@ -225,13 +225,23 @@ all specified as B<default>
 
 =item B<nodefault>
 
-all not specified as B<default> except B<resolve>
+all not specified as "B<default>" except B<resolve>
 
 =item B<all>
 
 all of the above except B<resolve>
 
 =back
+
+Added B<-> or B<_> symbols are ignored, and sometimes alternative spellings
+or plural forms are admissible. For instance, instead of B<no-default> is
+the same type as B<nodefault>.
+
+=item B<--no-comp=>I<type-list> or B<-T> I<type-list> or B<-n> I<type-list>
+
+This is analogous to B<--comp> except that all values in I<type-list> are
+considered as negated. For instance, B<-n nodefault,-recurse> is the same
+as B<-t -nodefault,recurse>,
 
 =item B<--ignore-path>I<path>
 
@@ -280,6 +290,7 @@ Martin VE<auml>th E<lt>martin@mvath.deE<gt>
 
 our $VERSION;
 my $exitstatus = 0;
+my $debug = 0;
 
 # Default for the Options:
 
@@ -290,77 +301,104 @@ my @ignore = ();
 my %prune = ();
 my @prune = ();
 
-{
+{  # Initialize closures for sub comptype
 my %opt = (
 	'content' => undef,
+	'contents' => 'content',
 	'data' => 'content',
+	'datas' => 'content',
 	'partialcontent' => undef,
+	'partialcontents' => 'partialcontent',
 	'size' => undef,
+	'sizes' => undef,
 	'length' => 'size',
+	'lengths' => 'size',
 	'dirsize' => undef,
+	'dirsizes' => 'dirsize',
 	'dircontent' => undef,
+	'dircontents' => 'dircontent',
 	'mtime' => undef,
+	'mtimes' => 'mtime',
 	'atime' => undef,
+	'atimes' => 'atime',
 	'ctime' => undef,
+	'ctimes' => 'ctime',
 	'times' => [ qw(mtime atime ctime) ],
+	'time' => 'times',
 	'nonfile' => undef,
-	'non-file' => 'nonfile',
+	'nonfiles' => 'nonfile',
 	'dir' => undef,
+	'dirs' => 'dir',
 	'link' => undef,
-	'devices' => undef,
+	'links' => 'link',
+	'device' => undef,
+	'devices' => 'device',
 	'resolve' => undef,
 	'follow' => 'resolve',
 	'linktype' => undef,
+	'linktypes' => 'linktype',
 	'linkdest' => undef,
+	'linkdests' => 'linkdest',
 	'hardlinks' => undef,
+	'hardlink' => 'hardlinks',
 	'mode' => undef,
+	'modes' => 'mode',
 	'owner' => undef,
+	'owners' => 'owner',
 	'group' => undef,
+	'groups' => 'group',
 	'perm' => [ qw(mode owner group) ],
 	'perms' => 'perm',
 	'permissions' => 'perm',
 	'warnlink' => undef,
-	'warn-link' => 'warnlink',
-	'link' => 'warnlink',
 	'warndangling' => undef,
-	'warn-dangling' => 'warndangling',
-	'dangling' => 'warndangling',
 	'warnzero' => undef,
-	'warn-zero' => 'warnzero',
-	'zero' => 'warnzero',
 	'warntype' => undef,
-	'warn-type' => 'warntype',
-	'type' => 'warntype',
 	'warn' => [ qw(warnlink warndangling warnzero warntype) ],
 	'warning' => 'warn',
 	'1' => undef,
 	'2' => undef,
 	'12' => [ qw(1 2) ],
 	'21' => '12',
-	'default' => [ qw(content size dircontent mtime nonfile dir devices
+	'default' => [ qw(content size dircontent mtime nonfile dir device
 		linktype linkdest perm 12) ],
+	'defaults' => 'default',
 	'nodefault' => [ qw(partialcontent dirsize ctime atime hardlinks
 		warn) ],
+	'nodefaults' => 'nodefault',
+	'nondefault' => 'nodefault',
+	'nondefaults' => 'nodefault',
+	'notdefault' => 'nodefault',
+	'notdefaults' => 'nodefault',
 	'all' => [ qw(default nodefault) ]
 );
 for my $i (values(%opt)) {
 	next unless(defined($i));
 	for my $j (ref($i) ? @$i : ($i)) {
-		&fatal("internal error: illegal option '$j'")
-			unless(exists($opt{$j}))
+		&fatal("internal error: illegal comptype '$j'")
+			unless(exists($opt{$j}));
+		my $value = $opt{$j};
+		&fatal("internal error: non-optimal reference in comptype '$j'")
+			if(defined($value) && !ref($value))
 	}
 }
 sub comptype {
-	for my $i (split(/[^a-zA-Z0-9\-\_]/, join(',', @_))) {
-		my $add = !($i =~ s{^\-+}{});
-		next if($i eq '');
-		&fatal("unknown comp type '$i'") unless(exists($opt{$i}));
-		my $value = $opt{$i};
-		if(($value // '') eq '') {
-			$comp{$i} = $add
-		} else {
-			for my $j (ref($value) ? @$value : ($value)) {
-				&comptype($add ? $j : '-' . $j)
+	my $negate = shift();
+	for my $string (@_) {
+		for my $i (split(/[\s\,\:\.\;]/, $string)) {
+			my $add = ($i =~ s{^[\-\!]+}{});
+			$add = !$add unless($negate);
+			next if($i eq '');
+			$i =~ s{[\-\_]}{}g;
+			&fatal("unknown comp type '$i'")
+				unless(exists($opt{$i}));
+			my $value = $opt{$i} // '';
+			if($value eq '') {
+				$comp{$i} = $add
+			} else {
+				for my $j (ref($value) ? @$value : ($value)) {
+					&comptype(!$add, $j)
+				}
 			}
 		}
 	}
@@ -368,7 +406,7 @@ sub comptype {
 
 sub print_comptypes {
 	for my $i (sort(keys(%comp))) {
-		print($i, ': ', ($comp{$i} ? 'active' : 'inactive'), "\n");
+		print($i, ': ', ($comp{$i} ? 'on' : '-'), "\n");
 	}
 	exit(0)
 }
@@ -401,6 +439,10 @@ sub join_quoted {
 sub shell_quote_best_effort {
 	(&use_shellquote() ?
 		&String::ShellQuote::shell_quote_best_effort : &join_quoted)
+}
+
+sub debug {
+	print(STDERR 'debug: ', @_, "\n")
 }
 
 sub error {
@@ -458,7 +500,7 @@ sub pod2usage {
 
 # Parse Options:
 
-&comptype(qw(-all -resolve default));
+&comptype(1, qw(all resolve -default));
 {
 	my $opt_down = '';
 Getopt::Long::Configure(qw(gnu_getopt));
@@ -467,12 +509,12 @@ Getopt::Long::GetOptions(
 	'man|?', sub { &pod2usage(-verbose => 2, -exit => 0) },
 	'version|V', \&version,
 	'down|d', \$opt_down,
-	'norecurse|r', sub { push(@prune, qr{.}) },
-	'nocomp|c', sub { &comptype('-content') },
-	'metadata|m', sub { &comptype('-dircontent') },
-	'warn|w', sub { &comptype('warn') },
-	'only-first|1', sub { &comptype('-2') },
-	'only-last|2', sub { &comptype('-1') },
+	'norecurse|no-recurse|r', sub { push(@prune, qr{.}) },
+	'nocontent|no-content|c', sub { &comptype(1, 'content') },
+	'metadata|m', sub { &comptype(1, 'dircontent') },
+	'warn|w', sub { &comptype('', 'warn') },
+	'only-first|onlyfirst|1', sub { &comptype(1, '2') },
+	'only-last|onlylast|2', sub { &comptype(1, '1') },
 	'tex|x', sub {
 		for my $i (qw(bbl ind dvi toc lof lot idx glo out
 			run.xml bcf log dlg ilg blg cb thm)) {
@@ -485,19 +527,22 @@ Getopt::Long::GetOptions(
 		}},
 	'recurse-resolve', \$recurseresolve,
 	'resolve|follow|l', sub { $recurseresolve = 1;
-		&comptype('resolve,-linktype,-linkname') },
-	'comp|C=s', sub { &comptype($_[1]) },
-	'ignore-path=s', sub { $ignore{File::Spec->canonpath($_[1])} = 1 },
-	'ignore-regexp=s', sub { push(@ignore, $_[1]) },
-	'prune-path=s', sub { $prune{File::Spec->canonpath($_[1])} = 1 },
-	'prune-regexp=s', sub { push(@prune, $_[1]) },
-	'cut-path=s', sub {
-		my $path = File::Spec->canonpath($_[1]);
+		&comptype(1, qw(-resolve linktype linkdest)) },
+	'comp|C|t=s', sub { &comptype('', $_[1]) },
+	'nocomp|no-comp|n|T=s', sub { &comptype(1, $_[1]) },
+	'ignore-path|ignorepath=s', sub {
+		$ignore{File::Spec->canonpath($_[1])} = 1 },
+	'ignore-regexp|ignore-regexp=s', sub { push(@ignore, $_[1]) },
+	'prune-path|prunepath=s', sub {
+		$prune{File::Spec->canonpath($_[1])} = 1 },
+	'prune-regexp|pruneregexp=s', sub { push(@prune, $_[1]) },
+	'cut-path|cutpath=s', sub { my $path = File::Spec->canonpath($_[1]);
 		$ignore{$path} = $prune{$path} = 1
 	},
-	'cut-regexp=s', sub { push(@ignore, $_[1]);
+	'cut-regexp|cutregexp=s', sub { push(@ignore, $_[1]);
 		push(@prune, $_[1]) },
-	'print-comptypes', \&print_comptypes
+	'print-comptypes|printcomptypes', \&print_comptypes,
+	'debug+', \$debug
 ) or &pod2usage(2);
 &pod2usage(2) unless(@ARGV);
 
@@ -555,14 +600,20 @@ my %find_args = (
 		return if($file =~ m{$i})
 	}
 	if($phase eq '2') {
+		&debug("Phase 2: $file") if($debug);
 		&comp($file, undef, $isdir) unless(exists($checked{$file}));
 		return
 	}
+	&debug("Phase 1: $file") if($debug);
 	my $dest = undef;
-	if(ref($destbase)) {
+	if(ref($destbase)) {  # destination is a directory
 		my @dirs = File::Spec->splitdir($file);
-		splice(@dirs, 0, scalar(@$currbase));
-		$dest = File::Spec->catdir(@$destbase, @dirs)
+		if(ref($currbase)) {  # source is a directory
+			splice(@dirs, 0, scalar(@$currbase));
+			$dest = File::Spec->catdir(@$destbase, @dirs)
+		} else {
+			$dest = File::Spec->catdir(@$destbase, pop(@dirs))
+		}
 	} else {
 		$dest = $destfile
 	}
@@ -597,7 +648,8 @@ sub comp {
 			}
 		}
 	}
-	my $isnolink = ($comp{'resolve'} || !($islink //= (-l $file)));
+	my $resolve = $comp{'resolve'};
+	my $isnolink = ($resolve || !($islink //= (-l $file)));
 	my @stat = ($isnolink ? stat($file) : lstat($file));
 	my $size;
 	if(@stat) {
@@ -612,7 +664,7 @@ sub comp {
 	my $destislink = undef;
 	my $destisnolink;
 	if(defined($dest)) {
-		$destisnolink = ($comp{'resolve'} || !($destislink //= (-l $dest)));
+		$destisnolink = ($resolve || !($destislink //= (-l $dest)));
 		@deststat = ($destisnolink ? stat($dest) : lstat($dest))
 	}
 	unless(@deststat) {
@@ -636,7 +688,7 @@ sub comp {
 	}
 	my $metadata = undef;
 	my $difftype = undef;
-	unless($comp{'resolve'}) {
+	unless($resolve) {
 		unless($islink eq $destislink) {
 			&printdiff($file, $dest, @diff);
 			return 1
@@ -675,7 +727,7 @@ sub comp {
 		push(@diff, 'mtimes')
 			if(($stat[9] != $deststat[9]) && $comp{'mtime'});
 		push(@diff, 'ctimes')
-			 if(($stat[10] != $deststat[10]) && $comp{'ctime'});
+			if(($stat[10] != $deststat[10]) && $comp{'ctime'});
 		push(@diff, 'atimes')
 			if(($stat[8] != $deststat[8]) && $comp{'atime'});
 		push(@diff, 'modes')
@@ -684,7 +736,7 @@ sub comp {
 			if(($stat[4] ne $deststat[4]) && $comp{'owner'});
 		push(@diff, 'groups')
 			if(($stat[5] ne $deststat[5]) && $comp{'group'});
-		unless($islink && !$comp{'resolve'}) {
+		unless($islink && !$resolve) {
 			$size //= $stat[7];
 			$destsize = $deststat[7];
 			if($size != $destsize) {
@@ -701,12 +753,12 @@ sub comp {
 				} else {
 					push(@diff, 'device-ids')
 						if(($stat[6] ne $deststat[6])
-							&& $comp{'devices'})
+							&& $comp{'device'})
 				}
 			}
 		}
 	}
-	unless($isdir || ($islink && !$comp{'resolve'})) {
+	unless($isdir || ($islink && !$resolve)) {
 		if($comp{'content'} || $comp{'partialcontent'}) {
 			$size //= $stat[7];
 			$destsize //= $deststat[7];
@@ -734,19 +786,24 @@ sub comparefile {
 		$blksize = 512 if($blksize < 512);
 		$blksize *= 1024 if($blksize <= 4096)
 	}
-	my $result = 1;
+	my $result = my $havea = my $haveb = 1;
 	my ($afile, $bfile);
 	if(open($afile, '<', $a)) {
 		binmode($afile)
 	} else {
 		&diffe('cannot open', $a);
-		$result = ''
+		$havea = ''
 	}
 	if(open($bfile, '<', $b)) {
 		binmode($bfile)
 	} else {
-		&diffe('cannot open ', $b);
-		$result = ''
+		&diffe('cannot open', $b);
+		$haveb = ''
+	}
+	unless($havea && $haveb) {
+		close($bfile) if($haveb);
+		close($afile) if($havea);
+		return 1  # ($havea eq $haveb)
 	}
 	while($result && ($toread > 0)) {
 		my $readnow = (($toread < $blksize) ? $toread : $blksize);
