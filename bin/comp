@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
-require 5.012;
-package Comp v4.1.0;
+BEGIN { require 5.012 }
+package Comp v4.1.1;
 
 use warnings;
 use strict;
@@ -11,6 +11,8 @@ use File::Spec ();
 use Getopt::Long 2.24 ();
 #use Pod::Usage ();
 #use String::ShellQuote ();  # not mandatory but recommended: poor fallback
+
+=encoding UTF-8
 
 =head1 NAME
 
