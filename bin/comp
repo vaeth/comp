@@ -1,6 +1,7 @@
 #!/usr/bin/env perl
-BEGIN { require 5.012 }
-package Comp v4.1.1;
+BEGIN { require 5.008 }
+our $VERSION = 'v4.1.2';
+eval "package Comp $VERSION" if($] ge '5.012');
 
 use warnings;
 use strict;
@@ -290,7 +291,6 @@ Martin VE<auml>th E<lt>martin@mvath.deE<gt>
 
 # Global Variables
 
-our $VERSION;
 my $exitstatus = 0;
 my $debug = 0;
 
