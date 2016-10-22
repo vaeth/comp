@@ -18,12 +18,12 @@ _arguments -C -s -S : \
 {'(--tex)-x','(-x)--tex'}'[TeX Mode\: Ignore temporary tex files ...]' \
 {'*-C+','*-t+','*--comp='}'[add specified comp types]:comp type:->comptypes' \
 {'*-n+','*-T+','*--nocomp='}'[sub specified comp types]:comp type:->comptypes' \
-'*-ignore-path=[ignore specified path]:ignore path:_files' \
-'*-prune-path=[prune at specified path]:prune path:_files' \
-'*-cut-path=[ignore \& prune at specified path]:cut path:_files' \
-'*-ignore-regexp=[ignore for specfied regexp]:ignore regexp:_files' \
-'*-prune-regexp=[prune for specified regexp]:prune regexp:_files' \
-'*-cut-regexp=[ignore \& prune for specified regexp]:cut regexp:_files' \
+'*--ignore-path=[ignore specified path]:ignore path:_files' \
+'*--prune-path=[prune at specified path]:prune path:_files' \
+'*--cut-path=[ignore \& prune at specified path]:cut path:_files' \
+'*--ignore-regexp=[ignore for specfied regexp]:ignore regexp:_files' \
+'*--prune-regexp=[prune for specified regexp]:prune regexp:_files' \
+'*--cut-regexp=[ignore \& prune for specified regexp]:cut regexp:_files' \
 '*:mask:_files'
 local ret=$?
 case $state in

@@ -1,7 +1,7 @@
 #!/usr/bin/env perl
 BEGIN { require 5.008 }
 package Comp;
-our $VERSION = 'v4.1.3';
+our $VERSION = 'v4.2.0';
 eval { $VERSION = version->declare($VERSION) };
 eval 'use version 0.77; $VERSION = version->declare($VERSION)' if($@);
 
@@ -561,8 +561,8 @@ for my $i (@ARGV) {
 my @baselist = ();
 for my $i (@ARGV) {
 	if((-d $i) && ($recurseresolve || !(-l $i))) {
-		my $j = [ (File::Spec->splitdir($i)) ];
-		push(@baselist, $j)
+		push(@baselist, [ (($i eq File::Spec->curdir()) ? () :
+			File::Spec->splitdir($i)) ])
 	} else {
 		push(@baselist, '')
 	}
