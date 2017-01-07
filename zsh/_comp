@@ -105,7 +105,6 @@ case $state in
 	'all:all except resolve'
 	'-all:all except resolve'
 	)
-	_describe -t comptypes 'comptype' comptypes
-	ret=$?;;
+	_describe -t comptypes 'comptype' comptypes && ret=0;;
 esac
 return ret
