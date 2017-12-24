@@ -1,9 +1,9 @@
 #!/usr/bin/env perl
 BEGIN { require 5.008 }
 package Comp;
-our $VERSION = 'v4.2.1';
+our $VERSION = 'v4.3.0';
 eval { $VERSION = version->declare($VERSION) };
-eval 'use version 0.77; $VERSION = version->declare($VERSION)' if($@);
+eval 'use version 0.77; $VERSION = version->declare($VERSION)' if ($@);
 
 use warnings;
 use strict;
@@ -377,13 +377,13 @@ my %opt = (
 	'all' => [ qw(default nodefault) ]
 );
 for my $i (values(%opt)) {
-	next unless(defined($i));
+	next unless (defined($i));
 	for my $j (ref($i) ? @$i : ($i)) {
 		&fatal("internal error: illegal comptype '$j'")
-			unless(exists($opt{$j}));
+			unless (exists($opt{$j}));
 		my $value = $opt{$j};
 		&fatal("internal error: non-optimal reference in comptype '$j'")
-			if(defined($value) && !ref($value))
+			if (defined($value) && !ref($value))
 	}
 }
 sub comptype {
@@ -391,13 +391,13 @@ sub comptype {
 	for my $string (@_) {
 		for my $i (split(/[\s\,\:\.\;]/, $string)) {
 			my $add = ($i =~ s{^[\-\!]+}{});
-			$add = !$add unless($negate);
-			next if($i eq '');
+			$add = !$add unless ($negate);
+			next if ($i eq '');
 			$i =~ s{[\-\_]}{}g;
 			&fatal("unknown comp type '$i'")
-				unless(exists($opt{$i}));
+				unless (exists($opt{$i}));
 			my $value = $opt{$i} // '';
-			if($value eq '') {
+			if ($value eq '') {
 				$comp{$i} = $add
 			} else {
 				for my $j (ref($value) ? @$value : ($value)) {
@@ -419,7 +419,7 @@ sub print_comptypes {
 
 { my $shellquote = undef;  # A closure static variable
 sub use_shellquote {
-	return $shellquote if(defined($shellquote));
+	return $shellquote if (defined($shellquote));
 	eval {
 		require String::ShellQuote
 	};
@@ -465,7 +465,7 @@ sub fatal {
 
 sub diff {
 	print(@_, "\n");
-	$exitstatus = 1 unless($exitstatus == 2)
+	$exitstatus = 1 unless ($exitstatus == 2)
 }
 
 sub diffn {
@@ -489,7 +489,7 @@ sub printdiff {
 	my $b = shift();
 	&diff('differing ', join(', ', @_),  ': ',
 		&shell_quote_best_effort($a), ' ',
-		&shell_quote_best_effort($b)) if(@_)
+		&shell_quote_best_effort($b)) if (@_)
 }
 
 sub version {
@@ -548,19 +548,19 @@ Getopt::Long::GetOptions(
 	'print-comptypes|printcomptypes', \&print_comptypes,
 	'debug+', \$debug
 ) or &pod2usage(2);
-&pod2usage(2) unless(@ARGV);
+&pod2usage(2) unless (@ARGV);
 
-push(@ARGV, File::Spec->curdir()) if(@ARGV == 1);
+push(@ARGV, File::Spec->curdir()) if (@ARGV == 1);
 for my $i (@ARGV) {
 	$i = File::Spec->canonpath($i);
-	$ignore{$i} = 1 if($opt_down);
-	&difff('cannot access', $i) unless(-e $i)
+	$ignore{$i} = 1 if ($opt_down);
+	&difff('cannot access', $i) unless (-e $i)
 }
 }  # end of option parsing
 
 my @baselist = ();
 for my $i (@ARGV) {
-	if((-d $i) && ($recurseresolve || !(-l $i))) {
+	if ((-d $i) && ($recurseresolve || !(-l $i))) {
 		push(@baselist, [ (($i eq File::Spec->curdir()) ? () :
 			File::Spec->splitdir($i)) ])
 	} else {
@@ -570,9 +570,9 @@ for my $i (@ARGV) {
 
 my $destfile = pop(@ARGV);
 my $destbase = pop(@baselist);
-unless(ref($destbase)) {
+unless (ref($destbase)) {
 	&fatal('when specifying 3 or more arguments, last must be a directory')
-		if(@ARGV > 1)
+		if (@ARGV > 1)
 }
 
 my $currbase;
@@ -585,34 +585,34 @@ my %find_args = (
 		sub { &diffw('dangling symlink', $_[0]) } : ''),
 	wanted => sub {
 	my $file = File::Spec->canonpath($_);
-	if($prune{$file}) {
+	if ($prune{$file}) {
 		$File::Find::prune = 1
 	} else {
 		for my $i (@prune) {
-			if($file =~ m{$i}) {
+			if ($file =~ m{$i}) {
 				$File::Find::prune = 1;
 				last
 			}
 		}
 	}
 	my $isdir = (-d $file);
-	if($isdir && !$comp{'dircontent'}) {
+	if ($isdir && !$comp{'dircontent'}) {
 		$File::Find::prune = 1
 	}
-	return if($ignore{$file});
+	return if ($ignore{$file});
 	for my $i (@ignore) {
-		return if($file =~ m{$i})
+		return if ($file =~ m{$i})
 	}
-	if($phase eq '2') {
-		&debug("Phase 2: $file") if($debug);
-		&comp($file, undef, $isdir) unless(exists($checked{$file}));
+	if ($phase eq '2') {
+		&debug("Phase 2: $file") if ($debug);
+		&comp($file, undef, $isdir) unless (exists($checked{$file}));
 		return
 	}
-	&debug("Phase 1: $file") if($debug);
+	&debug("Phase 1: $file") if ($debug);
 	my $dest = undef;
-	if(ref($destbase)) {  # destination is a directory
+	if (ref($destbase)) {  # destination is a directory
 		my @dirs = File::Spec->splitdir($file);
-		if(ref($currbase)) {  # source is a directory
+		if (ref($currbase)) {  # source is a directory
 			splice(@dirs, 0, scalar(@$currbase));
 			$dest = File::Spec->catdir(@$destbase, @dirs)
 		} else {
@@ -622,15 +622,16 @@ my %find_args = (
 		$dest = $destfile
 	}
 	&comp($file, $dest, $isdir)
-		unless(defined($dest) && exists($checked{$dest}));
-	$checked{$dest} = 1 if(defined($dest))
+		unless (defined($dest) && exists($checked{$dest}));
+	$checked{$dest} = 1 if (defined($dest))
 });
-if($recurseresolve) {
+if ($recurseresolve) {
 	$find_args{'follow'} = 1;
 	$find_args{'follow_skip'} = 2
 }
 
-for(my $i = 0; $i < @ARGV; ++$i) {
+no warnings 'File::Find';
+for (my $i = 0; $i < @ARGV; ++$i) {
 	$currbase = $baselist[$i];
 	File::Find::find(\%find_args, $ARGV[$i]);
 }
@@ -642,12 +643,12 @@ sub comp {
 	my ($file, $dest, $isdir) = @_;
 	my $islink = undef;
 	my $isfile = ($isdir ? '' : undef);
-	if($comp{'warnlink'}) {
-		&diffw('symlink', $file) if($islink //= (-l $file))
+	if ($comp{'warnlink'}) {
+		&diffw('symlink', $file) if ($islink //= (-l $file))
 	}
-	if($comp{'warntype'} && !$isdir) {
-		unless($islink //= (-l $file)) {
-			unless($isfile //= (-f $file)) {
+	if ($comp{'warntype'} && !$isdir) {
+		unless ($islink //= (-l $file)) {
+			unless ($isfile //= (-f $file)) {
 				&diffw('no ordinary type', $file)
 			}
 		}
@@ -656,9 +657,9 @@ sub comp {
 	my $isnolink = ($resolve || !($islink //= (-l $file)));
 	my @stat = ($isnolink ? stat($file) : lstat($file));
 	my $size;
-	if(@stat) {
+	if (@stat) {
 		$size = $stat[7];
-		&diffw('zero size file', $file) if((!$isdir) &&
+		&diffw('zero size file', $file) if ((!$isdir) &&
 			$isnolink && ($size <= 0) && $comp{'warnzero'} &&
 			($isfile //= (-f $file)))
 	} else {
@@ -667,106 +668,106 @@ sub comp {
 	my @deststat = ();
 	my $destislink = undef;
 	my $destisnolink;
-	if(defined($dest)) {
+	if (defined($dest)) {
 		$destisnolink = ($resolve || !($destislink //= (-l $dest)));
 		@deststat = ($destisnolink ? stat($dest) : lstat($dest))
 	}
-	unless(@deststat) {
-		&diffn('no match for', $file) if($comp{$phase});
+	unless (@deststat) {
+		&diffn('no match for', $file) if ($comp{$phase});
 		return ''
 	}
-	return 1 unless(@stat);
+	return 1 unless (@stat);
 	my @diff = ();
 	$islink //= (-l $file);
 	$destislink //= (-l $dest);
-	if($islink ne $destislink) {
-		push(@diff, 'link types') if($comp{'linktype'});
+	if ($islink ne $destislink) {
+		push(@diff, 'link types') if ($comp{'linktype'});
 	}
-	if((!$isnolink) && (!$destisnolink) && $comp{'linkdest'}) {
+	if ((!$isnolink) && (!$destisnolink) && $comp{'linkdest'}) {
 		my $a = readlink($file);
-		&diffe('cannot read link', $file) unless(defined($a));
+		&diffe('cannot read link', $file) unless (defined($a));
 		my $b = readlink($dest);
-		&diffe('cannot read link', $dest) unless(defined($b));
+		&diffe('cannot read link', $dest) unless (defined($b));
 		push(@diff, 'link destinations')
-			if(defined($a) && defined($b) && ($a ne $b))
+			if (defined($a) && defined($b) && ($a ne $b))
 	}
 	my $metadata = undef;
 	my $difftype = undef;
-	unless($resolve) {
-		unless($islink eq $destislink) {
+	unless ($resolve) {
+		unless ($islink eq $destislink) {
 			&printdiff($file, $dest, @diff);
 			return 1
 		}
-		if($islink) {
+		if ($islink) {
 			$metadata = $comp{'link'};
 			$difftype = ''
 		}
 	}
 	my $destisdir = undef;
 	my $destisfile = undef;
-	unless(defined($difftype)) {
+	unless (defined($difftype)) {
 		$destisdir = (-d $dest);
-		$destisfile = '' if($destisdir);
-		$difftype = 1 if($isdir ne $destisdir)
+		$destisfile = '' if ($destisdir);
+		$difftype = 1 if ($isdir ne $destisdir)
 	}
-	unless(defined($difftype)) {
+	unless (defined($difftype)) {
 		$isfile //= (-f $file);
 		$destisfile //= (-f $dest);
 		$difftype = ($isfile ne $destisfile)
 	}
-	if($difftype) {
+	if ($difftype) {
 		push(@diff, 'types');
 		&printdiff($file, $dest, @diff);
 		return 1
 	}
-	unless(defined($metadata)) {
-		$metadata = $comp{'dir'} if($isdir)
+	unless (defined($metadata)) {
+		$metadata = $comp{'dir'} if ($isdir)
 	}
-	unless(defined($metadata)) {
+	unless (defined($metadata)) {
 		$isfile //= (-f $file);
 		$metadata = ($isfile || $comp{'nonfile'})
 	}
 	my $destsize = undef;
-	if($metadata) {
+	if ($metadata) {
 		push(@diff, 'mtimes')
-			if(($stat[9] != $deststat[9]) && $comp{'mtime'});
+			if (($stat[9] != $deststat[9]) && $comp{'mtime'});
 		push(@diff, 'ctimes')
-			if(($stat[10] != $deststat[10]) && $comp{'ctime'});
+			if (($stat[10] != $deststat[10]) && $comp{'ctime'});
 		push(@diff, 'atimes')
-			if(($stat[8] != $deststat[8]) && $comp{'atime'});
+			if (($stat[8] != $deststat[8]) && $comp{'atime'});
 		push(@diff, 'modes')
-			if(($stat[2] ne $deststat[2]) && $comp{'mode'});
+			if (($stat[2] ne $deststat[2]) && $comp{'mode'});
 		push(@diff, 'owners')
-			if(($stat[4] ne $deststat[4]) && $comp{'owner'});
+			if (($stat[4] ne $deststat[4]) && $comp{'owner'});
 		push(@diff, 'groups')
-			if(($stat[5] ne $deststat[5]) && $comp{'group'});
-		unless($islink && !$resolve) {
+			if (($stat[5] ne $deststat[5]) && $comp{'group'});
+		unless ($islink && !$resolve) {
 			$size //= $stat[7];
 			$destsize = $deststat[7];
-			if($size != $destsize) {
+			if ($size != $destsize) {
 				push(@diff, 'sizes')
-					if($isdir ? $comp{'dirsize'}
+					if ($isdir ? $comp{'dirsize'}
 						: (($isfile //= (-f $file)) &&
 							$comp{'size'}))
 			}
-			unless($isdir) {
-				if($isfile //= (-f $file)) {
+			unless ($isdir) {
+				if ($isfile //= (-f $file)) {
 					push(@diff, 'hardlinks')
-						if(($stat[3] != $deststat[3])
+						if (($stat[3] != $deststat[3])
 							&& $comp{'hardlinks'})
 				} else {
 					push(@diff, 'device-ids')
-						if(($stat[6] ne $deststat[6])
+						if (($stat[6] ne $deststat[6])
 							&& $comp{'device'})
 				}
 			}
 		}
 	}
-	unless($isdir || ($islink && !$resolve)) {
-		if($comp{'content'} || $comp{'partialcontent'}) {
+	unless ($isdir || ($islink && !$resolve)) {
+		if ($comp{'content'} || $comp{'partialcontent'}) {
 			$size //= $stat[7];
 			$destsize //= $deststat[7];
-			if((($size == $destsize) || $comp{'partialcontent'})
+			if ((($size == $destsize) || $comp{'partialcontent'})
 				&& ($isfile //= (-f $file))) {
 				my $minsize = ($size <= $destsize) ?
 					$size : $destsize;
@@ -782,48 +783,48 @@ sub comp {
 
 sub comparefile {
 	my ($a, $b, $toread, $as, $bs) = @_;
-	return 1 if(($as->[0] eq $bs->[0]) && ($as->[1] eq $bs->[1]));
+	return 1 if (($as->[0] eq $bs->[0]) && ($as->[1] eq $bs->[1]));
 	my $blksize = ($as->[11] // 0);
 	{
 		my $destblksize = ($bs->[11] // 0);
-		$blksize = $destblksize if($destblksize > $blksize);
-		$blksize = 512 if($blksize < 512);
-		$blksize *= 1024 if($blksize <= 4096)
+		$blksize = $destblksize if ($destblksize > $blksize);
+		$blksize = 512 if ($blksize < 512);
+		$blksize *= 1024 if ($blksize <= 4096)
 	}
 	my $result = my $havea = my $haveb = 1;
 	my ($afile, $bfile);
-	if(open($afile, '<', $a)) {
+	if (open($afile, '<', $a)) {
 		binmode($afile)
 	} else {
 		&diffe('cannot open', $a);
 		$havea = ''
 	}
-	if(open($bfile, '<', $b)) {
+	if (open($bfile, '<', $b)) {
 		binmode($bfile)
 	} else {
 		&diffe('cannot open', $b);
 		$haveb = ''
 	}
-	unless($havea && $haveb) {
-		close($bfile) if($haveb);
-		close($afile) if($havea);
+	unless ($havea && $haveb) {
+		close($bfile) if ($haveb);
+		close($afile) if ($havea);
 		return 1  # ($havea eq $haveb)
 	}
-	while($result && ($toread > 0)) {
+	while ($result && ($toread > 0)) {
 		my $readnow = (($toread < $blksize) ? $toread : $blksize);
 		my ($ablock, $bblock);
-		if((read($afile, $ablock, $readnow)) != $readnow) {
+		if ((read($afile, $ablock, $readnow)) != $readnow) {
 			&diffe('read error for file ', $a);
 			$result = ''
 		}
-		if((read($bfile, $bblock, $readnow)) != $readnow) {
+		if ((read($bfile, $bblock, $readnow)) != $readnow) {
 			&diffe('read error for file ', $b);
 			$result = ''
 		}
-		if($result && ($ablock ne $bblock)) {
+		if ($result && ($ablock ne $bblock)) {
 			$result = ''
 		}
-		$toread -= $readnow if($result)
+		$toread -= $readnow if ($result)
 	}
 	close($bfile);
 	close($afile);
