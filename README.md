@@ -2,10 +2,9 @@
 
 Compare files or directories, including metadata
 
-Author: Martin V�th (martin at mvath.de)
-
-This project is under a BSD type license, meaning that you can do practically
-everything with it except removing my name.
+Author: Martin Väth (martin at mvath.de)
+This project is under the BSD license 2.0 (“3-clause BSD license”).
+SPDX-License-Identifier: BSD-3-Clause
 
 The command `comp` is similar to `diff -r -q`, but it compares also metadata
 like symlinks, timestamps, permissions, partial content, etc.
