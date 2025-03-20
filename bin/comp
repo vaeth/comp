@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 BEGIN { require 5.008 }
 package Comp;
-our $VERSION = 'v4.3.1';
+our $VERSION = 'v4.3.2';
 eval { $VERSION = version->declare($VERSION) };
 eval 'use version 0.77; $VERSION = version->declare($VERSION)' if ($@);
 
@@ -537,7 +537,7 @@ Getopt::Long::GetOptions(
 	'nocomp|no-comp|n|T=s', sub { &comptype(1, $_[1]) },
 	'ignore-path|ignorepath=s', sub {
 		$ignore{File::Spec->canonpath($_[1])} = 1 },
-	'ignore-regexp|ignore-regexp=s', sub { push(@ignore, $_[1]) },
+	'ignore-regexp|ignoreregexp=s', sub { push(@ignore, $_[1]) },
 	'prune-path|prunepath=s', sub {
 		$prune{File::Spec->canonpath($_[1])} = 1 },
 	'prune-regexp|pruneregexp=s', sub { push(@prune, $_[1]) },
